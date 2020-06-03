@@ -1,0 +1,135 @@
+---
+title: "Bayesian AB Testing Example"
+output: 
+  flexdashboard::flex_dashboard:
+    social: menu
+    orientation: rows
+    vertical_layout: scroll
+    # source_code: embed
+    css: style.css
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+source('setup.R')
+```
+
+Inputs {.sidebar data-width=200 data-padding=20}
+--------------- 
+
+### 
+
+```{r}
+test_select
+```
+
+```{r results='as-is'}
+
+renderTable({
+  overview <- as_tibble(c(
+    str_c('Start Date: ',df_tests$start_date[df_tests$test_name == input$selected_test]),
+    str_c('End Date: ',df_tests$start_date[df_tests$test_name == input$selected_test])
+    ))
+
+  colnames(overview) <- 'Overview'
+  overview
+  })
+```
+
+```{r}
+lift_slider
+```
+
+```{r}
+alpha
+beta
+```
+
+Row {data-padding=30}
+------------------
+
+### Posterior Success Rate Distribution {data-padding=20}
+
+```{r}
+
+output$plot_distribution <- renderPlotly({
+  f_plot_distributions(df_summary %>% filter(test_name == input$selected_test), 
+                       input$alpha_select, input$beta_select)
+})
+
+plotlyOutput("plot_distribution")
+```
+
+### Posterior Daily Success Rate {data-padding=20}
+
+
+```{r}
+output$plot_daily_rates <- renderPlotly({
+  f_plot_daily_rate(df_daily %>% filter(test_name == input$selected_test),input$alpha_select, input$beta_select)
+})
+plotlyOutput("plot_daily_rates")
+```
+
+Row {data-padding=20}
+------------------
+
+```{r}
+
+test_results <- reactive({
+
+    df <- df_summary %>% filter(test_name == input$selected_test)
+
+    control <- df %>% filter(variation == 'Control')
+    control_samples <- c(rep.int(0, control$failure), rep.int(1, control$successes))
+
+    results <- df %>%
+      group_by(variation) %>%
+      mutate(results = list(f_test_variations(success_a = successes,
+                                              failure_a = failure,
+                                              input$alpha_select,
+                                              input$beta_select,
+                                              control_samples,
+                                              lift = input$lift))) %>%
+      unnest()
+
+    results <- results %>%
+      mutate(probability = round(probability, 4)) %>%
+      arrange(desc(probability),desc(rate)) %>%
+      mutate(rate = scales::percent(rate),
+             probability = scales::percent(probability),
+             percent_lift = scales::percent(percent_lift/100),
+             expected_loss = scales::percent(expected_loss)) %>%
+      select(test_name, variation, trials, successes, rate, probability, percent_lift, expected_loss)
+
+    return(results)
+
+  })
+
+output$overall_summary <- renderDataTable({
+
+  test_results() %>%
+    mutate(
+      probability = ifelse(variation=='Control','-' ,probability),
+      percent_lift = ifelse(variation=='Control','-',percent_lift),
+      expected_loss = ifelse(variation=='Control','-',expected_loss)
+    ) %>%
+    select(
+      `Test Name` = test_name,
+      `Variation` = variation,
+      `Trials` = trials,
+      `Successes`= successes,
+      `Rate` = rate,
+      `Probability Variation > Control` = probability,
+      `Desired Lift` = percent_lift,
+      `Expected Loss` = expected_loss
+    ) %>%
+    arrange(Variation) %>%
+    DT::datatable(rownames = FALSE,
+                  options = list(paging = FALSE, searching = FALSE,
+                                 columnDefs = list(list(className = 'dt-left', targets = "_all"))))
+})
+
+dataTableOutput('overall_summary')
+
+```
