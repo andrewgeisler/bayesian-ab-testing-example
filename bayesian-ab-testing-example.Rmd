@@ -54,8 +54,12 @@ Row {data-padding=30}
 ```{r}
 
 output$plot_distribution <- renderPlotly({
-  f_plot_distributions(df_summary %>% filter(test_name == input$selected_test), 
-                       input$alpha_select, input$beta_select)
+  f_plot_distributions(
+    df_summary %>% 
+      filter(
+        test_name == input$selected_test), 
+        input$alpha_select, input$beta_select
+    )
 })
 
 plotlyOutput("plot_distribution")
@@ -66,7 +70,12 @@ plotlyOutput("plot_distribution")
 
 ```{r}
 output$plot_daily_rates <- renderPlotly({
-  f_plot_daily_rate(df_daily %>% filter(test_name == input$selected_test),input$alpha_select, input$beta_select)
+  f_plot_daily_rate(
+    df_daily %>% 
+      filter(test_name == input$selected_test),
+    input$alpha_select, 
+    input$beta_select
+  )
 })
 plotlyOutput("plot_daily_rates")
 ```
@@ -85,21 +94,25 @@ test_results <- reactive({
 
     results <- df %>%
       group_by(variation) %>%
-      mutate(results = list(f_test_variations(success_a = successes,
-                                              failure_a = failure,
-                                              input$alpha_select,
-                                              input$beta_select,
-                                              control_samples,
-                                              lift = input$lift))) %>%
+      mutate(results = list(f_test_variations(
+        success_a = successes,
+        failure_a = failure,
+        input$alpha_select,
+        input$beta_select,
+        control_samples,
+        lift = input$lift))
+      ) %>%
       unnest()
 
     results <- results %>%
       mutate(probability = round(probability, 4)) %>%
       arrange(desc(probability),desc(rate)) %>%
-      mutate(rate = scales::percent(rate),
-             probability = scales::percent(probability),
-             percent_lift = scales::percent(percent_lift/100),
-             expected_loss = scales::percent(expected_loss)) %>%
+      mutate(
+        rate = scales::percent(rate),
+        probability = scales::percent(probability),
+        percent_lift = scales::percent(percent_lift/100),
+        expected_loss = scales::percent(expected_loss)
+      ) %>%
       select(test_name, variation, trials, successes, rate, probability, percent_lift, expected_loss)
 
     return(results)
@@ -125,9 +138,13 @@ output$overall_summary <- renderDataTable({
       `Expected Loss` = expected_loss
     ) %>%
     arrange(Variation) %>%
-    DT::datatable(rownames = FALSE,
-                  options = list(paging = FALSE, searching = FALSE,
-                                 columnDefs = list(list(className = 'dt-left', targets = "_all"))))
+    DT::datatable(
+      rownames = FALSE,
+      options = list(
+        paging = FALSE, searching = FALSE,
+        columnDefs = list(list(className = 'dt-left', targets = "_all"))
+        )
+      )
 })
 
 dataTableOutput('overall_summary')
